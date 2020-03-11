@@ -1,1 +1,1 @@
-50 14 * * 1-5 daemon python3 /data/tradeTip/indexTip.py
+50 14 * * 1-5 daemon sh /data/tradeTip/run.sh &>> /tmp/tradeTipCron.log
