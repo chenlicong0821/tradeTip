@@ -32,5 +32,3 @@ CurDate=`date "+%Y%m%d"`
 LogFile="$logDir/run.log.$CurDate"
 
 runPython "$WORKDIR/indexTip.py"
-
-echo 'run over'
