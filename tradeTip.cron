@@ -1,0 +1,1 @@
+50 14 * * 1-5 daemon python3 /data/tradeTip/indexTip.py
