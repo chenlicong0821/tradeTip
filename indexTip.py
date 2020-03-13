@@ -95,7 +95,7 @@ class TCQtIdx(IntEnum):
 class dataFromTencent():
     def __init__(self):
         self.STARMarketPattern = re.compile(r'sh68[89]+')
-        self.marketIdDict = {'1': 'sh', '51': 'sz'}
+        self.marketIdDict = {'1': 'sh', '51': 'sz', '200': 'us'}
         self.baseUrl = 'http://qt.gtimg.cn/q='
 
     def _getVolume(self, code, rawVolume):
@@ -111,8 +111,9 @@ class dataFromTencent():
             log.warning(f'codeFlag:{codeFlag} not match code:{code}')
             return False
 
-    def _checkCodeData(self, codeData, code):
-        if self.marketIdDict[codeData[TCQtIdx.MARKET_ID]] + codeData[TCQtIdx.RAW_SYMBOL] == code:
+    def _checkCodeData(self, codeData, code, market):
+        rawSymbol = codeData[TCQtIdx.RAW_SYMBOL] if market != 'us' else codeData[TCQtIdx.RAW_SYMBOL].split('.')[0]
+        if self.marketIdDict[codeData[TCQtIdx.MARKET_ID]] + rawSymbol == code:
             return True
         else:
             log.warning(f'codeData:{codeData} not match code:{code}')
@@ -132,11 +133,13 @@ class dataFromTencent():
             #     print(idx, item, TCQtIdx._value2member_map_[idx])
 
             code = codeList[i]
-            if not (self._checkCodeFlag(codeFlag, code) and self._checkCodeData(info, code)):
+            market = code[:2]
+            if not (self._checkCodeFlag(codeFlag, code) and self._checkCodeData(info, code, market)):
                 continue
 
             qtDatetime = info[TCQtIdx.QUOTE_DATETIME]
-            qtDatetime = datetime.datetime.strptime(qtDatetime, "%Y%m%d%H%M%S")
+            qtDatetime = datetime.datetime.strptime(qtDatetime,
+                                                    "%Y%m%d%H%M%S" if market != 'us' else "%Y-%m-%d %H:%M:%S")
             if qtDatetime < datetime.datetime(2020, 1, 1):
                 log.warning(f"quoteTime {qtDatetime} incorrect")
                 continue
@@ -243,6 +246,7 @@ class dataProcess():
 class msgSend():
     def __init__(self):
         self.DDGroupUrl = 'https://oapi.dingtalk.com/robot/send?access_token=414e08cc157d6229a5361cd0fe38bb5bec7cffc3bbee31cc5458adeecfb73bd1'
+        self.DDGroupUrlTest = 'https://oapi.dingtalk.com/robot/send?access_token=ade8c4666ba4477a4dad6b4359eb83d6a46c22fe85a8163ace13ada1ff4723b3'
 
     def _sendDDGrp(self, text, retry=True):
         try:
@@ -297,7 +301,7 @@ if __name__ == '__main__':
     log = logging.getLogger(logname)
 
     # 以2019-09-10的收盘价为基准
-    codeData = {'sh000001': 3021.2, 'sh000919': 4902.99, 'sh000922': 4381.25}
+    codeData = {'sh000001': 3021.2, 'sh000919': 4902.99, 'sh000922': 4381.25, 'sh000170': 5474.77}
     # codeList = ['sh688001', 'sz000063', 'sh000001']
     qtData = dataFromTencent().fetchData(list(codeData.keys()))
     log.info(f'qtData:{qtData}')
