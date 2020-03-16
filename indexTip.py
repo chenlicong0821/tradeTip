@@ -313,9 +313,13 @@ if __name__ == '__main__':
     logInit(f'./log/{logname}.log')
     log = logging.getLogger(logname)
 
-    # 以2019-09-10的收盘价为基准
-    codeData = {'sh000001': 3021.2, 'sh000919': 4902.99, 'sh000922': 4381.25, 'sh000170': 5474.77, 'hkHSI': 26683.68}
-    # codeList = ['sh688001', 'sz000063', 'sh000001']
+    # # 以2019-09-10的收盘价为基准
+    # codeData = {'sh000001': 3021.2, 'sh000919': 4902.99, 'sh000922': 4381.25, 'sh000925': 4366.95,
+    #             'sh000170': 5474.77, 'hkHSI': 26683.68}
+    # 以2020-03-16的MA500为基准，其中hkHSI以2020-03-16的MA1000为基准
+    codeData = {'sh000001': 2904.667, 'sh000919': 4725.945, 'sh000922': 4298.479, 'sh000925': 4202.138,
+                'sh000170': 5097.254, 'hkHSI': 26309.026}
+    codeList = ['sh688001', 'sz000063', 'sh000001']
     qtData = dataFromTencent().fetchData(list(codeData.keys()))
     log.info(f'qtData:{qtData}')
     resData = dataProcess().calData(codeData, qtData, 200, 4)
