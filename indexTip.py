@@ -95,7 +95,7 @@ class TCQtIdx(IntEnum):
 class dataFromTencent():
     def __init__(self):
         self.STARMarketPattern = re.compile(r'sh68[89]+')
-        self.marketIdDict = {'1': 'sh', '51': 'sz', '200': 'us'}
+        self.marketIdDict = {'1': 'sh', '51': 'sz', '100': 'hk', '200': 'us'}
         self.baseUrl = 'http://qt.gtimg.cn/q='
 
     def _getVolume(self, code, rawVolume):
@@ -105,7 +105,7 @@ class dataFromTencent():
             return rawVolume * 100
 
     def _checkCodeFlag(self, codeFlag, code):
-        if codeFlag.startswith('v_') and (codeFlag[2:] == code):
+        if codeFlag.startswith('v_') and (codeFlag[2:] == code if code[:2] != 'hk' else codeFlag[2:] == ('r_' + code)):
             return True
         else:
             log.warning(f'codeFlag:{codeFlag} not match code:{code}')
@@ -118,6 +118,14 @@ class dataFromTencent():
         else:
             log.warning(f'codeData:{codeData} not match code:{code}')
             return False
+
+    def _getQtDateTimeFmt(self, market):
+        if market == 'hk':
+            return "%Y/%m/%d %H:%M:%S"
+        elif market == 'us':
+            return "%Y-%m-%d %H:%M:%S"
+        else:
+            return "%Y%m%d%H%M%S"
 
     def _parseData(self, text, codeList):
         res = {}
@@ -138,8 +146,7 @@ class dataFromTencent():
                 continue
 
             qtDatetime = info[TCQtIdx.QUOTE_DATETIME]
-            qtDatetime = datetime.datetime.strptime(qtDatetime,
-                                                    "%Y%m%d%H%M%S" if market != 'us' else "%Y-%m-%d %H:%M:%S")
+            qtDatetime = datetime.datetime.strptime(qtDatetime, self._getQtDateTimeFmt(market))
             if qtDatetime < datetime.datetime(2020, 1, 1):
                 log.warning(f"quoteTime {qtDatetime} incorrect")
                 continue
@@ -162,7 +169,13 @@ class dataFromTencent():
     def fetchData(self, codeList, retry=True):
         res = {}
         try:
-            url = self.baseUrl + ','.join(codeList)
+            reqCodes = []
+            for code in codeList:
+                if code[:2] == 'hk':
+                    reqCodes.append('r_' + code)
+                else:
+                    reqCodes.append(code)
+            url = self.baseUrl + ','.join(reqCodes)
             req = requests.get(url, timeout=2)
             if 200 == req.status_code:
                 # print(req.headers['Content-Type'])
@@ -301,7 +314,7 @@ if __name__ == '__main__':
     log = logging.getLogger(logname)
 
     # 以2019-09-10的收盘价为基准
-    codeData = {'sh000001': 3021.2, 'sh000919': 4902.99, 'sh000922': 4381.25, 'sh000170': 5474.77}
+    codeData = {'sh000001': 3021.2, 'sh000919': 4902.99, 'sh000922': 4381.25, 'sh000170': 5474.77, 'hkHSI': 26683.68}
     # codeList = ['sh688001', 'sz000063', 'sh000001']
     qtData = dataFromTencent().fetchData(list(codeData.keys()))
     log.info(f'qtData:{qtData}')
