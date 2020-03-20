@@ -207,9 +207,9 @@ class dataFromTencent():
 
 class dataProcess():
     def __init__(self):
-        self.buyChgPct = -1.1
+        self.buyChgPct = -1.5
         self.sellChgPct = 1.2
-        self.totalDownPct = -10
+        self.totalDownPct = -15
         self.totalUpPct1 = 10
         self.totalUpPct2 = 20
 
@@ -217,19 +217,18 @@ class dataProcess():
         suggest = '无'
         if dtNow.date() != qtDatetime.date():
             suggest = '非交易日'
-        elif totalChgPct <= self.totalDownPct:
-            suggest = '买入'
-        elif totalChgPct >= self.totalUpPct1:
-            if totalChgPct >= self.totalUpPct2:
+        if totalChgPct >= self.totalUpPct1:  # 总涨幅超过基准点位的totalUpPct1，就考虑卖出
+            if totalChgPct >= self.totalUpPct2:  # 总涨幅超过基准点位的totalUpPct2
                 suggest = '强烈卖出'
-            else:
+            elif chgPct >= self.sellChgPct:  # 当天涨幅超过sellChgPct
                 suggest = '卖出'
-        elif chgPct <= self.buyChgPct:
-            suggest = '买入'
-        elif chgPct >= self.sellChgPct:
-            suggest = '卖出'
-        elif dtNow.weekday() in (0, 1):  # 周一、周二
-            suggest = '买入'
+        elif chgPct < self.sellChgPct:  # 总涨幅未超过基准点位的totalUpPct1，且当天涨幅未超过sellChgPct，就考虑买入
+            if totalChgPct <= self.totalDownPct:  # 总跌幅达到基准点位的totalDownPct
+                suggest = '买入'
+            elif chgPct <= self.buyChgPct:  # 当天跌幅达到buyChgPct
+                suggest = '买入'
+            elif dtNow.weekday() in (0, 1):  # 周一、周二
+                suggest = '买入'
 
         return suggest
 
