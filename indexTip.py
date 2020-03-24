@@ -211,25 +211,25 @@ class dataProcess():
         self.sellChgPct = 1.4
         self.totalDownPct1 = -10
         self.totalDownPct2 = -20
-        self.totalUpPct1 = 11
+        self.totalUpPct1 = 10
         self.totalUpPct2 = 20
 
     def _getTradeSuggest(self, dtNow, qtDatetime, totalChgPct, chgPct):
         suggest = '无'
         if dtNow.date() != qtDatetime.date():
             suggest = '非交易日'
-        if totalChgPct >= self.totalUpPct1:  # 总涨幅超过基准点位的totalUpPct1，就考虑卖出
+        if totalChgPct >= (self.totalUpPct1 + self.sellChgPct):  # 总涨幅超过基准点位的totalUpPct1+sellChgPct，就考虑卖出
             if totalChgPct >= self.totalUpPct2:  # 总涨幅超过基准点位的totalUpPct2
                 suggest = '强烈卖出'
             elif chgPct >= self.sellChgPct:  # 当天涨幅超过sellChgPct
                 suggest = '卖出'
-        elif chgPct < self.sellChgPct:  # 总涨幅未超过基准点位的totalUpPct1，且当天涨幅未超过sellChgPct，就考虑买入
-            if totalChgPct <= self.totalDownPct1:  # 总跌幅达到基准点位的totalDownPct1，考虑加仓买入
+        elif totalChgPct < self.totalUpPct1:  # 总涨幅未超过基准点位的totalUpPct1，就考虑买入
+            if totalChgPct <= (self.totalDownPct1 + self.buyChgPct):  # 总跌幅达到基准点位的totalDownPct1+buyChgPct，考虑加仓买入
                 if totalChgPct <= self.totalDownPct2:  # 总跌幅达到基准点位的totalDownPct2
                     suggest = '买入'
                 elif chgPct <= self.buyChgPct:  # 当天跌幅达到buyChgPct
                     suggest = '买入'
-            elif dtNow.weekday() in (0, 1):  # 周一、周二，正常买入
+            elif dtNow.weekday() in (0, 1) and (chgPct < self.sellChgPct):  # 周一或周二、且当天涨幅未超过sellChgPct，正常买入
                 suggest = '买入'
 
         return suggest
