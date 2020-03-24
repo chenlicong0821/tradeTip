@@ -224,13 +224,15 @@ class dataProcess():
             elif chgPct >= self.sellChgPct:  # 当天涨幅超过sellChgPct
                 suggest = '卖出'
         elif totalChgPct < self.totalUpPct1:  # 总涨幅未超过基准点位的totalUpPct1，就考虑买入
-            if totalChgPct <= (self.totalDownPct1 + self.buyChgPct):  # 总跌幅达到基准点位的totalDownPct1+buyChgPct，考虑加仓买入
+            # 周一或周二，且当天涨幅未超过sellChgPct或总跌幅达到totalDownPct1，正常买入
+            if dtNow.weekday() in (0, 1) and (chgPct < self.sellChgPct or totalChgPct <= self.totalDownPct1):
+                suggest = '买入'
+            # 总跌幅达到基准点位的totalDownPct1+buyChgPct，考虑加仓买入
+            elif totalChgPct <= (self.totalDownPct1 + self.buyChgPct):
                 if totalChgPct <= self.totalDownPct2:  # 总跌幅达到基准点位的totalDownPct2
                     suggest = '买入'
                 elif chgPct <= self.buyChgPct:  # 当天跌幅达到buyChgPct
                     suggest = '买入'
-            elif dtNow.weekday() in (0, 1) and (chgPct < self.sellChgPct):  # 周一或周二、且当天涨幅未超过sellChgPct，正常买入
-                suggest = '买入'
 
         return suggest
 
