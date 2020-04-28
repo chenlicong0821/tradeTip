@@ -1,1 +1,1 @@
-50 14 * * 1-5 daemon sh /data/tradeTip/run.sh &> /dev/null
+50 14 * * 1-5 root sh /data/tradeTip/run.sh &> /dev/null

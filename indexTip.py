@@ -218,7 +218,8 @@ class dataProcess():
         suggest = '无'
         if dtNow.date() != qtDatetime.date():
             suggest = '非交易日'
-        elif totalChgPct >= (self.totalUpPct1 + self.sellChgPct):  # 总涨幅超过基准点位的totalUpPct1+sellChgPct，就考虑卖出
+        # 总涨幅超过基准点位的totalUpPct1+sellChgPct，就考虑卖出
+        elif totalChgPct >= (self.totalUpPct1 + self.sellChgPct):
             if totalChgPct >= self.totalUpPct2:  # 总涨幅超过基准点位的totalUpPct2
                 suggest = '强烈卖出'
             elif chgPct >= self.sellChgPct:  # 当天涨幅超过sellChgPct
