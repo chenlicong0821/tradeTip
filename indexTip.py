@@ -6,10 +6,12 @@ import json
 import logging
 import os
 import re
+import sys
 import time
 from enum import IntEnum
 
 import requests
+import urls
 
 
 def logInit(logfile):
@@ -96,7 +98,7 @@ class dataFromTencent():
     def __init__(self):
         self.STARMarketPattern = re.compile(r'sh68[89]+')
         self.marketIdDict = {'1': 'sh', '51': 'sz', '100': 'hk', '200': 'us'}
-        self.baseUrl = 'http://qt.gtimg.cn/q='
+        self.baseUrl = urls.tcQtUrl
 
     def _getVolume(self, code, rawVolume):
         if (self.STARMarketPattern.match(code)):  # 科创板
@@ -193,6 +195,8 @@ class dataFromTencent():
                     time.sleep(2)
                     return self.fetchData(codeList, retry=False)
                 log.error(f'Get {url} failed after retry, ret code:{req.status_code}')
+
+            log.info(f'{sys._getframe().f_code.co_name} success')
         except requests.RequestException as e:
             if retry:
                 log.error(f'Get {url} failed, error:{e}')
@@ -200,7 +204,7 @@ class dataFromTencent():
                 return self.fetchData(codeList, retry=False)
             log.error(f'Get {url} failed after retry, error:{e}')
         except Exception as e:
-            log.exception(f'fetch failed: {e}')
+            log.exception(f'{sys._getframe().f_code.co_name} failed: {e}')
 
         return res
 
@@ -218,7 +222,8 @@ class dataProcess():
         suggest = '无'
         if dtNow.date() != qtDatetime.date():
             suggest = '非交易日'
-        elif totalChgPct >= (self.totalUpPct1 + self.sellChgPct):  # 总涨幅超过基准点位的totalUpPct1+sellChgPct，就考虑卖出
+        # 总涨幅超过基准点位的totalUpPct1+sellChgPct，就考虑卖出
+        elif totalChgPct >= (self.totalUpPct1 + self.sellChgPct):
             if totalChgPct >= self.totalUpPct2:  # 总涨幅超过基准点位的totalUpPct2
                 suggest = '强烈卖出'
             elif chgPct >= self.sellChgPct:  # 当天涨幅超过sellChgPct
@@ -239,6 +244,7 @@ class dataProcess():
     def calData(self, codeData, qtData, baseMoney, powerN):
         res = []
         try:
+            dataList = []
             dtNow = datetime.datetime.now()
             for code, basePrice in codeData.items():
                 if code not in qtData:
@@ -251,30 +257,34 @@ class dataProcess():
                 tradeSuggest = self._getTradeSuggest(dtNow, qtDatetime, totalChgPct, chgPct)
                 buyMoney = round(baseMoney * pow(basePrice / lastPrice, powerN), 2)
 
-                res.append((code, chsName, qtDatetime.strftime('%m-%d %H:%M:%S'), f'{lastPrice}',
-                            f'{round(chgPct, 2)}%', f'{totalChgPct}%', tradeSuggest, f'{buyMoney}'))
+                dataList.append((code, chsName, qtDatetime.strftime('%m-%d %H:%M:%S'), f'{lastPrice}',
+                                 f'{round(chgPct, 2)}%', f'{totalChgPct}%', tradeSuggest, f'{buyMoney}'))
+
+            # 按建议买入金额buyMoney由高到低排序
+            res = sorted(dataList, key=lambda item: (float(item[-1])), reverse=True)
+            log.info(f'{sys._getframe().f_code.co_name} success')
         except Exception as e:
-            log.exception(f'fetch failed: {e}')
+            log.exception(f'{sys._getframe().f_code.co_name} failed: {e}')
 
         return res
 
 
 class msgSend():
     def __init__(self):
-        self.DDGroupUrl = 'https://oapi.dingtalk.com/robot/send?access_token=414e08cc157d6229a5361cd0fe38bb5bec7cffc3bbee31cc5458adeecfb73bd1'
-        self.DDGroupUrlTest = 'https://oapi.dingtalk.com/robot/send?access_token=ade8c4666ba4477a4dad6b4359eb83d6a46c22fe85a8163ace13ada1ff4723b3'
+        self.DDGroupUrl = urls.DDGroupUrl
+        self.QyweixinUrl = urls.QyweixinUrl
 
     def _sendDDGrp(self, text, retry=True):
         try:
-            data = {'msgtype': 'text', 'text': {"content": text}}
-            headers = {'Content-Type': "application/json; charset=utf-8"}
-            timeout = (2, 5)
             url = self.DDGroupUrl
+            headers = {'Content-Type': "application/json; charset=utf-8"}
+            data = {'msgtype': 'text', 'text': {"content": text}}
+            timeout = (2, 5)
             r = requests.post(url=url, headers=headers, data=json.dumps(data), timeout=timeout)
             if r.status_code == 200:
                 res = r.json()
                 if res.get('errcode') == 0:
-                    return "OK"
+                    pass
                 else:
                     reason = res.get('errmsg').encode('utf8')
                     log.error(f'send msg to {url} failed, reason:{reason}')
@@ -286,6 +296,8 @@ class msgSend():
                     return self._sendDDGrp(text, retry=False)
                 log.error(f'send msg to {url} failed after retry, ret code:{r.status_code}')
                 return "ERROR"
+
+            log.info(f'{sys._getframe().f_code.co_name} success')
         except requests.RequestException as e:
             if retry:
                 log.error(f'send msg to {url} failed, error:{e}')
@@ -294,8 +306,48 @@ class msgSend():
             log.error(f'send msg to {url} failed after retry, error:{e}')
             return "ERROR"
         except Exception as e:
-            log.error(f'send msg failed, error:{e}')
+            log.error(f'{sys._getframe().f_code.co_name} failed, error:{e}')
             return "ERROR"
+
+        return "OK"
+
+    def _sendQyweixinGrp(self, text, retry=True):
+        try:
+            url = self.QyweixinUrl
+            headers = {'Content-Type': "application/json; charset=utf-8"}
+            data = {'msgtype': 'text', 'text': {"content": text}}
+            timeout = (2, 5)
+            r = requests.post(url=url, headers=headers, data=json.dumps(data), timeout=timeout)
+            if r.status_code == 200:
+                res = r.json()
+                if res.get('errcode') == 0:
+                    pass
+                else:
+                    reason = res.get('errmsg').encode('utf8')
+                    log.error(f'send msg to {url} failed, reason:{reason}')
+                    return 'ERROR'
+            else:
+                if retry:
+                    log.warning(
+                        f'send msg to {url} failed, ret code:{r.status_code}')
+                    time.sleep(3)
+                    return self._sendDDGrp(text, retry=False)
+                log.error(f'send msg to {url} failed after retry, ret code:{r.status_code}')
+                return "ERROR"
+
+            log.info(f'{sys._getframe().f_code.co_name} success')
+        except requests.RequestException as e:
+            if retry:
+                log.error(f'send msg to {url} failed, error:{e}')
+                time.sleep(3)
+                return self._sendDDGrp(text, retry=False)
+            log.error(f'send msg to {url} failed after retry, error:{e}')
+            return "ERROR"
+        except Exception as e:
+            log.error(f'{sys._getframe().f_code.co_name} failed, error:{e}')
+            return "ERROR"
+
+        return "OK"
 
     def send(self, sendData):
         sep = '\n'
@@ -306,9 +358,9 @@ class msgSend():
         content.append(f'{sep}time: {dtNow}')
         msg = sep.join(content)
 
-        DDGroupRet = self._sendDDGrp(msg)
+        ret = [self._sendDDGrp(msg), self._sendQyweixinGrp(msg)]
 
-        return DDGroupRet
+        return ret
 
 
 if __name__ == '__main__':
