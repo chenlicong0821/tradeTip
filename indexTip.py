@@ -218,10 +218,13 @@ class dataProcess():
         self.totalUpPct1 = 10
         self.totalUpPct2 = 20
 
-    def _getTradeSuggest(self, dtNow, qtDatetime, totalChgPct, chgPct):
+    def _getTradeSuggest(self, dtNow, qtDatetime, lastPrice, totalChgPct, chgPct, sellPrice):
         suggest = '无'
         if dtNow.date() != qtDatetime.date():
             suggest = '非交易日'
+        # lastPrice达到设定的sellPrice，就考虑卖出
+        elif lastPrice >= sellPrice:
+            suggest = f'达到{sellPrice}卖出'
         # 总涨幅超过基准点位的totalUpPct1+sellChgPct，就考虑卖出
         elif totalChgPct >= (self.totalUpPct1 + self.sellChgPct):
             if totalChgPct >= self.totalUpPct2:  # 总涨幅超过基准点位的totalUpPct2
@@ -241,12 +244,12 @@ class dataProcess():
 
         return suggest
 
-    def calData(self, codeData, qtData, baseMoney, powerN):
+    def calData(self, codeData, qtData, defaultBaseMoney, powerN):
         res = []
         try:
             dataList = []
             dtNow = datetime.datetime.now()
-            for code, basePrice in codeData.items():
+            for code, (basePrice, sellPrice, secuType, baseMoney) in codeData.items():
                 if code not in qtData:
                     log.warning(f'code:{code} not in qtData')
                     res.append((code, 'it not in qtData'))
@@ -254,14 +257,26 @@ class dataProcess():
 
                 chsName, qtDatetime, lastPrice, chgPct = qtData[code]
                 totalChgPct = round(100 * (lastPrice - basePrice) / basePrice, 2)
-                tradeSuggest = self._getTradeSuggest(dtNow, qtDatetime, totalChgPct, chgPct)
-                buyMoney = round(baseMoney * pow(basePrice / lastPrice, powerN), 2)
+                tradeSuggest = self._getTradeSuggest(dtNow, qtDatetime, lastPrice, totalChgPct, chgPct, sellPrice)
+                if baseMoney <= 0:
+                    baseMoney = defaultBaseMoney
+                buyVol = 0
+                buyMoney = 0
+                if secuType == 'ETF':
+                    buyMoneyInit = baseMoney * pow(basePrice / lastPrice, powerN)
+                    buyHand = round(buyMoneyInit / (lastPrice * 100), 0)
+                    buyVol = buyHand * 100
+                    buyMoney = round(lastPrice * buyVol, 2)
+                else:
+                    buyVol = pow(basePrice / lastPrice, powerN)
+                    buyMoney = round(baseMoney * buyVol, 2)
 
                 dataList.append((code, chsName, qtDatetime.strftime('%m-%d %H:%M:%S'), f'{lastPrice}',
-                                 f'{round(chgPct, 2)}%', f'{totalChgPct}%', tradeSuggest, f'{buyMoney}'))
+                                 f'{round(chgPct, 2)}%', f'{totalChgPct}%', tradeSuggest, f'{round(buyVol, 2)}',
+                                 f'{buyMoney}'))
 
             # 按建议买入金额buyMoney由高到低排序
-            res = sorted(dataList, key=lambda item: (float(item[-1])), reverse=True)
+            res = sorted(dataList, key=lambda item: (float(item[5][:-1])), reverse=False)
             log.info(f'{sys._getframe().f_code.co_name} success')
         except Exception as e:
             log.exception(f'{sys._getframe().f_code.co_name} failed: {e}')
@@ -352,13 +367,15 @@ class msgSend():
     def send(self, sendData):
         sep = '\n'
         sendData = [('code', 'chsName', 'qtDatetime', 'lastPrice', 'chgPct', 'totalChgPct', 'tradeSuggest',
-                     'buyMoney')] + sendData
+                     'buyVol', 'buyMoney')] + sendData
         content = [', '.join(line) for line in sendData]
         dtNow = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
         content.append(f'{sep}time: {dtNow}')
         msg = sep.join(content)
 
-        ret = [self._sendDDGrp(msg), self._sendQyweixinGrp(msg)]
+        ret = [self._sendDDGrp(msg),
+               self._sendQyweixinGrp(msg)
+               ]
 
         return ret
 
@@ -371,9 +388,22 @@ if __name__ == '__main__':
     # # 以2019-09-10的收盘价为基准
     # codeData = {'sh000001': 3021.2, 'sh000919': 4902.99, 'sh000922': 4381.25, 'sh000925': 4366.95,
     #             'sh000170': 5474.77, 'hkHSI': 26683.68}
-    # 以2020-03-16的MA500为基准，其中hkHSI以2020-03-16的MA1000为基准
-    codeData = {'sh000001': 2904.667, 'sh000919': 4725.945, 'sh000922': 4298.479, 'sh000925': 4202.138,
-                'sh000170': 5097.254, 'hkHSI': 26309.026}
+    # 默认以2020-03-16的MA500为基准价
+    # codeData格式：{code: (basePrice, sellPrice, secuType, baseMoney)}
+    codeData = {
+        'sz399702': (6450.389, 7736.84, 'index', -1),  # 深证F120，19.94%
+        'sz159910': (1.712, 2.127, 'ETF', 2000),  # 深证F120 ETF，24.24%
+        'sz399550': (6604.355, 7827.59, 'index', -1),  # 央视50，18.52%
+        'sz159965': (1.047, 1.339, 'ETF', 2000),  # 央视50 ETF，22.5%。以2020-05-06的MA250为基准
+        'sh000170': (5097.254, 6000, 'index', -1),  # 50AH优选，17.71%
+        'sh501050': (1.213, 1.505, 'ETF', 2000),  # 50AH LOF，24.07%
+        'sh000016': (2728.95, 3215.91, 'index', -1),  # 上证50，17.84%
+        'sh000919': (4725.945, 5393.44, 'index', -1),  # 300价值，14.12%
+        'sh000922': (4298.479, 5083.33, 'index', -1),  # 中证红利，18.26%
+        'sh000925': (4202.138, 4669.81, 'index', -1),  # 基本面50，11.13%
+        'sh000001': (2904.667, 3548.52, 'index', -1),  # 上证指数，22.17%
+        'hkHSI': (26309.026, 31287.88, 'index', -1)  # 恒生指数，18.92%。以2020-03-16的MA1000为基准
+    }
     codeList = ['sh688001', 'sz000063', 'sh000001']
     qtData = dataFromTencent().fetchData(list(codeData.keys()))
     log.info(f'qtData:{qtData}')
