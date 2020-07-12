@@ -216,7 +216,7 @@ class dataProcess():
         self.totalDownPct1 = -10
         self.totalDownPct2 = -20
         self.totalUpPct1 = 11
-        self.totalUpPct2 = 24
+        self.totalUpPct2 = 20
 
     def _getTradeSuggest(self, dtNow, qtDatetime, lastPrice, totalChgPct, chgPct, sellPrice):
         suggest = '无'
@@ -257,8 +257,8 @@ class dataProcess():
 
                 chsName, qtDatetime, lastPrice, chgPct = qtData[code]
                 totalChgPct = round(100 * (lastPrice - basePrice) / basePrice, 2)
-                # sellChgPct = round(100 * (sellPrice - basePrice) / basePrice, 2)
                 lastToSellPct = round(100 * (lastPrice - sellPrice) / sellPrice, 2)
+                sellChgPct = round(100 * (sellPrice - basePrice) / basePrice, 2)
                 tradeSuggest = self._getTradeSuggest(dtNow, qtDatetime, lastPrice, totalChgPct, chgPct, sellPrice)
                 if baseMoney <= 0:
                     baseMoney = defaultBaseMoney
@@ -275,7 +275,7 @@ class dataProcess():
 
                 dataList.append((code, chsName, qtDatetime.strftime('%m-%d %H:%M:%S'), f'{lastPrice}',
                                  f'{round(chgPct, 2)}%', f'{totalChgPct}%', tradeSuggest, f'{round(buyVol, 2)}',
-                                 f'{buyMoney}', f'{lastToSellPct}%'))
+                                 f'{buyMoney}', f'{lastToSellPct}%', f'{sellChgPct}%'))
 
             # 按建议买入金额buyMoney由高到低排序
             res = sorted(dataList, key=lambda item: (float(item[5][:-1])), reverse=False)
@@ -369,7 +369,7 @@ class msgSend():
     def send(self, sendData):
         sep = '\n'
         sendData = [('code', 'chsName', 'qtDatetime', 'lastPrice', 'chgPct', 'totalChgPct', 'tradeSuggest',
-                     'buyVol', 'buyMoney', 'lastToSellPct')] + sendData
+                     'buyVol', 'buyMoney', 'lastToSellPct', 'sellChgPct')] + sendData
         content = [', '.join(line) for line in sendData]
         dtNow = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
         content.append(f'{sep}time: {dtNow}')
@@ -409,22 +409,22 @@ if __name__ == '__main__':
     # 默认以2020-07-10的MA1000为基准价、MA120为目标价
     # codeData格式：{code: (basePrice, sellPrice, secuType, baseMoney)}
     codeData = {
-        'sh000932': (12106.581, 17238.114, 'index', -1),  # 中证消费
-        'sz159928': (2.24, 3.242, 'ETF', 20000),  # 中证消费ETF
-        'sz399701': (6702.473, 8028.414, 'index', -1),  # 深证F60。2020-03-13 MA120为目标价
-        'sz159916': (3.497, 4.308, 'ETF', 20000),  # 深F60 ETF。2020-03-13 MA120为目标价
-        'sz399702': (6273.182, 7169.157, 'index', -1),  # 深证F120
-        'sz159910': (1.639, 1.93, 'ETF', 20000),  # 深证F120 ETF
-        'sz399550': (6298.361, 7286.942, 'index', -1),  # 央视50。2018-04-24 MA120为目标价
-        'sz159965': (1.083, 1.144, 'ETF', 20000),  # 央视50 ETF。2020-07-10的MA250为基准价、MA60为目标价
-        # 'sh000170': (5133.008, 5574.124, 'index', -1),  # 50AH优选。2020-07-10的MA500为基准价、2020-01-23 MA60为目标价
-        # 'sh501050': (1.23, 1.342, 'ETF', 20000),  # 50AH LOF。2020-07-10的MA500为基准价、2020-01-23 MA60为目标价
+        'sh000932': (16504.882, 19299.093, 'index', -1),  # 中证消费。2020-07-10的MA250为基准价、MA30为目标价
+        'sz159928': (3.098, 3.649, 'ETF', 20000),  # 中证消费ETF。2020-07-10的MA250为基准价、MA30为目标价
+        'sz399701': (7181.274, 8317.387, 'index', -1),  # 深证F60。2020-07-10的MA500为基准价、2020-03-13 A60为目标价
+        # 'sz159916': (3.823, 4.445, 'ETF', 20000),  # 深F60 ETF。2020-07-10的MA500为基准价、2020-03-13 A60为目标价
+        'sz399702': (6491.832, 7418.204, 'index', -1),  # 深证F120。2020-07-10的MA500为基准价、2020-03-13 A60为目标价
+        'sz159910': (1.733, 1.994, 'ETF', 20000),  # 深证F120 ETF。2020-07-10的MA500为基准价、2020-03-13 A60为目标价
+        'sz399550': (6602.926, 7449.134, 'index', -1),  # 央视50。2020-07-10的MA500为基准价、2018-03-22 MA60为目标价
+        'sz159965': (1.083, 1.193, 'ETF', 20000),  # 央视50 ETF。2020-07-10的MA250为基准价、MA30为目标价
+        # 'sh000170': (5133.008, 5677.468, 'index', -1),  # 50AH优选。2020-07-10的MA500为基准价、2020-01-23 MA30为目标价
+        # 'sh501050': (1.23, 1.362, 'ETF', 20000),  # 50AH LOF。2020-07-10的MA500为基准价、2020-01-23 MA30为目标价
         # 'sh000016': (2635.838, 2965.167, 'index', -1),  # 上证50。2020-03-06 MA120为目标价
         'sh000919': (4510.335, 5141.756, 'index', -1),  # 300价值。2018-04-13 MA120为目标价
         'sh000925': (4019.155, 4524.765, 'index', -1),  # 基本面50。2018-04-13 MA120为目标价
         'sh000922': (4293.802, 4819.761, 'index', -1),  # 中证红利。2018-03-22 MA120为目标价
         'sh000001': (3028.058, 3373.018, 'index', -1),  # 上证指数。2018-02-08 MA120为目标价
-        'hkHSI': (26592.763, 30876.395, 'index', -1)  # 恒生指数。2018-06-21 MA120为目标价
+        'hkHSI': (26592.763, 29604.089, 'index', -1)  # 恒生指数。2018-08-31 MA250为目标价
     }
     codeList = ['sh688001', 'sz000063', 'sh000001']
     qtData = dataFromTencent().fetchData(list(codeData.keys()))
