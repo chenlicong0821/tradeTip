@@ -213,27 +213,32 @@ class dataFromTencent():
 class dataProcess():
     def __init__(self):
         self.buyChgPct = -1.4
-        self.sellChgPct = 1.4
+        self.sellChgPct = 2.5
         self.totalDownPct1 = -10
         self.totalDownPct2 = -20
-        self.totalUpPct1 = 11
-        self.totalUpPct2 = 30
+        self.totalUpPct1 = 20
+        self.totalUpPct2 = 32
 
-    def _getTradeSuggest(self, dtNow, qtDatetime, lastPrice, totalChgPct, chgPct, sellPrice):
+    def _getTradeSuggest(self, dtNow, qtDatetime, lastPrice, totalChgPct, chgPct, sellPrice, totalUpPct1, totalUpPct2):
+        if totalUpPct1 <= 0:
+            totalUpPct1 = self.totalUpPct1
+        if totalUpPct2 <= 0:
+            totalUpPct2 = self.totalUpPct2
+
         suggest = '无'
         if dtNow.date() != qtDatetime.date():
             suggest = '非交易日'
         # lastPrice达到设定的sellPrice，就考虑卖出
-        elif lastPrice >= sellPrice:
-            suggest = f'达到{sellPrice}卖出'
+        # elif lastPrice >= sellPrice:
+        #     suggest = f'达到{sellPrice}卖出'
         # 总涨幅超过基准点位的totalUpPct1+sellChgPct，就考虑卖出
-        elif totalChgPct >= (self.totalUpPct1 + self.sellChgPct):
-            if totalChgPct >= self.totalUpPct2:  # 总涨幅超过基准点位的totalUpPct2
+        elif totalChgPct >= (totalUpPct1 + self.sellChgPct):
+            if totalChgPct >= totalUpPct2:  # 总涨幅超过基准点位的totalUpPct2
                 suggest = '强烈卖出'
             elif chgPct >= self.sellChgPct:  # 当天涨幅超过sellChgPct
                 suggest = '卖出'
-        elif totalChgPct < self.totalUpPct1:  # 总涨幅未超过基准点位的totalUpPct1，就考虑买入
-            # 周一或周四，且当天涨幅未超过sellChgPct或总跌幅达到buyChgPct，正常买入
+        elif totalChgPct < totalUpPct1:  # 总涨幅未超过基准点位的totalUpPct1，就考虑买入
+            # 当天涨幅未超过sellChgPct或总跌幅达到buyChgPct，正常买入
             if dtNow.weekday() in (0, 3) and (chgPct < self.sellChgPct or totalChgPct <= self.buyChgPct):
                 suggest = '买入'
             # 总跌幅达到基准点位的totalDownPct1+buyChgPct，考虑加仓买入
@@ -250,7 +255,7 @@ class dataProcess():
         try:
             dataList = []
             dtNow = datetime.datetime.now()
-            for code, (basePrice, sellPrice, secuType, baseMoney) in codeData.items():
+            for code, (basePrice, sellPrice, secuType, baseMoney, totalUpPct1, totalUpPct2) in codeData.items():
                 if code not in qtData:
                     log.warning(f'code:{code} not in qtData')
                     res.append((code, 'it not in qtData'))
@@ -260,7 +265,8 @@ class dataProcess():
                 totalChgPct = round(100 * (lastPrice - basePrice) / basePrice, 2)
                 lastToSellPct = round(100 * (lastPrice - sellPrice) / sellPrice, 2)
                 sellChgPct = round(100 * (sellPrice - basePrice) / basePrice, 2)
-                tradeSuggest = self._getTradeSuggest(dtNow, qtDatetime, lastPrice, totalChgPct, chgPct, sellPrice)
+                tradeSuggest = self._getTradeSuggest(dtNow, qtDatetime, lastPrice, totalChgPct, chgPct, sellPrice,
+                                                     totalUpPct1, totalUpPct2)
                 if baseMoney <= 0:
                     baseMoney = defaultBaseMoney
                 buyVol = 0
@@ -390,7 +396,7 @@ if __name__ == '__main__':
 
     qtData = dataFromTencent().fetchData(list(codeData.codeData.keys()))
     log.info(f'qtData:{qtData}')
-    resData = dataProcess().calData(codeData.codeData, qtData, 200, 4)
+    resData = dataProcess().calData(codeData.codeData, qtData, 500, 4)
     log.info(f'resData:{resData}')
     sendRes = msgSend().send(resData)
     log.info(f'message send {sendRes}')
