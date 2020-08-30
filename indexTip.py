@@ -10,9 +10,9 @@ import sys
 import time
 from enum import IntEnum
 
+import codeData
 import requests
 import urls
-import codeData
 
 
 def logInit(logfile):
@@ -217,7 +217,7 @@ class dataProcess():
         self.totalDownPct1 = -10
         self.totalDownPct2 = -20
         self.totalUpPct1 = 11
-        self.totalUpPct2 = 20
+        self.totalUpPct2 = 30
 
     def _getTradeSuggest(self, dtNow, qtDatetime, lastPrice, totalChgPct, chgPct, sellPrice):
         suggest = '无'
@@ -278,7 +278,7 @@ class dataProcess():
                                  f'{round(chgPct, 2)}%', f'{totalChgPct}%', tradeSuggest, f'{round(buyVol, 2)}',
                                  f'{buyMoney}', f'{lastToSellPct}%', f'{sellChgPct}%'))
 
-            # 按建议买入金额buyMoney由高到低排序
+            # 按总涨跌幅totalChgPct由低到高排序
             res = sorted(dataList, key=lambda item: (float(item[5][:-1])), reverse=False)
             log.info(f'{sys._getframe().f_code.co_name} success')
         except Exception as e:
@@ -368,12 +368,12 @@ class msgSend():
         return "OK"
 
     def send(self, sendData):
-        sep = '\n'
+        sep = '\n\n'
         sendData = [('code', 'chsName', 'qtDatetime', 'lastPrice', 'chgPct', 'totalChgPct', 'tradeSuggest',
                      'buyVol', 'buyMoney', 'lastToSellPct', 'sellChgPct')] + sendData
         content = [', '.join(line) for line in sendData]
         dtNow = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
-        content.append(f'{sep}time: {dtNow}')
+        content.append(f'time: {dtNow}')
         msg = sep.join(content)
 
         ret = [self._sendDDGrp(msg),
