@@ -10,8 +10,9 @@ import sys
 import time
 from enum import IntEnum
 
-import codeData
 import requests
+
+import codeData
 import urls
 
 
@@ -250,12 +251,12 @@ class dataProcess():
 
         return suggest
 
-    def calData(self, codeData, qtData, defaultBaseMoney, powerN):
+    def calData(self, codeData, qtData, defaultBaseMoney, defaultPowerN):
         res = []
         try:
             dataList = []
             dtNow = datetime.datetime.now()
-            for code, (basePrice, sellPrice, secuType, baseMoney, totalUpPct1, totalUpPct2) in codeData.items():
+            for code, (basePrice, sellPrice, secuType, baseMoney, powerN, totalUpPct1, totalUpPct2) in codeData.items():
                 if code not in qtData:
                     log.warning(f'code:{code} not in qtData')
                     res.append((code, 'it not in qtData'))
@@ -269,6 +270,8 @@ class dataProcess():
                                                      totalUpPct1, totalUpPct2)
                 if baseMoney <= 0:
                     baseMoney = defaultBaseMoney
+                if powerN <= 0:
+                    powerN = defaultPowerN
                 buyVol = 0
                 buyMoney = 0
                 if secuType == 'ETF':
