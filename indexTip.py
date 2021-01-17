@@ -213,63 +213,59 @@ class dataFromTencent():
 
 class dataProcess():
     def __init__(self):
-        self.buyChgPct = -1.4
-        self.sellChgPct = 2.5
+        self.initBuyChgPct = -3
+        self.initSellChgPct = 4
         self.totalDownPct1 = -10
         self.totalDownPct2 = -20
-        self.totalUpPct1 = 20
-        self.totalUpPct2 = 32
 
-    def _getTradeSuggest(self, dtNow, qtDatetime, lastPrice, totalChgPct, chgPct, sellPrice, totalUpPct1, totalUpPct2):
-        if totalUpPct1 <= 0:
-            totalUpPct1 = self.totalUpPct1
-        if totalUpPct2 <= 0:
-            totalUpPct2 = self.totalUpPct2
-
+    def _getTradeSuggest(self, dtNow, qtDatetime, chgPct, lastChgPct, sellChgPct, sell2ChgPct):
         suggest = '无'
         if dtNow.date() != qtDatetime.date():
             suggest = '非交易日'
-        # lastPrice达到设定的sellPrice，就考虑卖出
-        # elif lastPrice >= sellPrice:
-        #     suggest = f'达到{sellPrice}卖出'
-        # 总涨幅超过基准点位的totalUpPct1+sellChgPct，就考虑卖出
-        elif totalChgPct >= (totalUpPct1 + self.sellChgPct):
-            if totalChgPct >= totalUpPct2:  # 总涨幅超过基准点位的totalUpPct2
+        # lastChgPct达到sellChgPct，就考虑卖出
+        # elif lastChgPct >= sellChgPct:
+        #     suggest = f'卖出'
+        # lastChgPct达到sell2ChgPct，就考虑卖出
+        elif lastChgPct >= sell2ChgPct:
+            if lastChgPct >= (sell2ChgPct + self.initSellChgPct):
                 suggest = '强烈卖出'
-            elif chgPct >= self.sellChgPct:  # 当天涨幅超过sellChgPct
+            else:
                 suggest = '卖出'
-        elif totalChgPct < totalUpPct1:  # 总涨幅未超过基准点位的totalUpPct1，就考虑买入
-            # 当天涨幅未超过sellChgPct或总跌幅达到buyChgPct，正常买入
-            if dtNow.weekday() in (0, 3) and (chgPct < self.sellChgPct or totalChgPct <= self.buyChgPct):
+        elif lastChgPct < sell2ChgPct:  # lastChgPct未超过sell2ChgPct，就考虑买入
+            # 当天涨幅未超过sellChgPct，正常买入
+            if dtNow.weekday() in (0, 3) and (chgPct < self.initSellChgPct):
                 suggest = '买入'
-            # 总跌幅达到基准点位的totalDownPct1+buyChgPct，考虑加仓买入
-            elif totalChgPct <= (self.totalDownPct1 + self.buyChgPct):
-                if totalChgPct <= self.totalDownPct2:  # 总跌幅达到基准点位的totalDownPct2
+            # 总跌幅达到基准点位的totalDownPct1+initBuyChgPct，考虑加仓买入
+            elif lastChgPct <= (self.totalDownPct1 + self.initBuyChgPct):
+                if lastChgPct <= self.totalDownPct2:  # 总跌幅达到基准点位的totalDownPct2
                     suggest = '买入'
-                elif chgPct <= self.buyChgPct:  # 当天跌幅达到buyChgPct
+                elif chgPct <= self.initBuyChgPct:  # 当天跌幅达到initBuyChgPct
                     suggest = '买入'
 
         return suggest
 
-    def calData(self, codeData, qtData, defaultBaseMoney, defaultPowerN):
+    def calData(self, codeData, qtData, defaulInitMoney, defaultPowerN):
         res = []
         try:
             dataList = []
             dtNow = datetime.datetime.now()
-            for code, (basePrice, sellPrice, secuType, baseMoney, powerN, totalUpPct1, totalUpPct2) in codeData.items():
+            for code, (
+                    basePrice, basePrice2, sellPrice, sellPrice2, initPrice, secuType, initMoney,
+                    powerN) in codeData.items():
                 if code not in qtData:
                     log.warning(f'code:{code} not in qtData')
                     res.append((code, 'it not in qtData'))
                     continue
 
                 chsName, qtDatetime, lastPrice, chgPct = qtData[code]
-                totalChgPct = round(100 * (lastPrice - basePrice) / basePrice, 2)
-                lastToSellPct = round(100 * (lastPrice - sellPrice) / sellPrice, 2)
+                lastChgPct = round(100 * (lastPrice - basePrice) / basePrice, 2)
                 sellChgPct = round(100 * (sellPrice - basePrice) / basePrice, 2)
-                tradeSuggest = self._getTradeSuggest(dtNow, qtDatetime, lastPrice, totalChgPct, chgPct, sellPrice,
-                                                     totalUpPct1, totalUpPct2)
-                if baseMoney <= 0:
-                    baseMoney = defaultBaseMoney
+                sell2ChgPct = round(100 * (sellPrice2 - basePrice) / basePrice, 2)
+                tradeSuggest = self._getTradeSuggest(dtNow, qtDatetime, chgPct, lastChgPct, sellChgPct,
+                                                     sell2ChgPct)
+                if initMoney <= 0:
+                    initMoney = defaulInitMoney
+                baseMoney = initMoney * (basePrice2 / initPrice)
                 if powerN <= 0:
                     powerN = defaultPowerN
                 buyVol = 0
@@ -284,8 +280,9 @@ class dataProcess():
                     buyMoney = round(baseMoney * buyVol, 2)
 
                 dataList.append((code, chsName, qtDatetime.strftime('%m-%d %H:%M:%S'), f'{lastPrice}',
-                                 f'{round(chgPct, 2)}%', f'{totalChgPct}%', tradeSuggest, f'{round(buyVol, 2)}',
-                                 f'{buyMoney}', f'{lastToSellPct}%', f'{sellChgPct}%'))
+                                 f'{round(chgPct, 2)}%', f'{lastChgPct}%', f'{sellChgPct}%', f'{sell2ChgPct}%',
+                                 tradeSuggest, f'{round(buyVol, 2)}',
+                                 f'{buyMoney}'))
 
             # 按总涨跌幅totalChgPct由低到高排序
             res = sorted(dataList, key=lambda item: (float(item[5][:-1])), reverse=False)
@@ -378,8 +375,8 @@ class msgSend():
 
     def send(self, sendData):
         sep = '\n\n'
-        sendData = [('code', 'chsName', 'qtDatetime', 'lastPrice', 'chgPct', 'totalChgPct', 'tradeSuggest',
-                     'buyVol', 'buyMoney', 'lastToSellPct', 'sellChgPct')] + sendData
+        sendData = [('code', 'chsName', 'qtDatetime', 'lastPrice', 'chgPct', 'lastChgPct', 'sellChgPct', 'sell2ChgPct',
+                     'tradeSuggest', 'buyVol', 'buyMoney')] + sendData
         content = [', '.join(line) for line in sendData]
         dtNow = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
         content.append(f'time: {dtNow}')
@@ -399,7 +396,7 @@ if __name__ == '__main__':
 
     qtData = dataFromTencent().fetchData(list(codeData.codeData.keys()))
     log.info(f'qtData:{qtData}')
-    resData = dataProcess().calData(codeData.codeData, qtData, 500, 4)
+    resData = dataProcess().calData(codeData.codeData, qtData, 500, 2)
     log.info(f'resData:{resData}')
     sendRes = msgSend().send(resData)
     log.info(f'message send {sendRes}')
